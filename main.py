@@ -114,12 +114,8 @@ class Game:
         pygame.display.flip()
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     g = Game()
     g.new()
     g.run()
     pygame.quit()
     sys.exit()
-=======
-    main()
->>>>>>> caf73bf18b044086e455308fcd6e8d18683d7af2
