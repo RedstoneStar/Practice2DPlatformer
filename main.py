@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import asyncio
 from settings import *
 from sprites import *
 
@@ -181,7 +182,6 @@ class Game:
             pygame.draw.circle(self.screen, (c, c, c), (px, py), 1 + size * 1.5)
 
     def draw_hud(self):
-        # Subtle pulsing animation for HUD elements
         pulse = math.sin(pygame.time.get_ticks() / 300.0) * 2
         title_txt = self.font.render("Simple 2D Platformer", True, (150, 150, 180))
         score_txt = self.font.render(f"Score: {self.score}", True, TEXT_COLOR)
@@ -241,13 +241,17 @@ class Game:
             
         pygame.display.flip()
 
-    def run(self):
+    async def run(self):
         while True:
             dt = self.clock.tick(FPS) / 1000.0
             self.events()
             self.update(dt)
             self.draw()
+            await asyncio.sleep(0)
+
+async def main():
+    g = Game()
+    await g.run()
 
 if __name__ == "__main__":
-    g = Game()
-    g.run()
+    asyncio.run(main())
