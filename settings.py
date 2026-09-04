@@ -1,11 +1,10 @@
 import pygame
 
-# --- ENGINE & DISPLAY ---
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
 FPS = 60
 TILE_SIZE = 40 
 
-# --- COLORS ---
 BG_TOP = (15, 20, 30)
 BG_BOTTOM = (40, 35, 60)
 PLAYER_COLOR = (40, 200, 150)
@@ -19,7 +18,6 @@ SPRING_COLOR = (50, 255, 50)
 GOAL_COLOR = (100, 200, 255)
 TEXT_COLOR = (255, 255, 255)
 
-# --- PHYSICS ---
 GRAVITY = 1800
 JUMP_STRENGTH = -650
 SPRING_STRENGTH = -1200
@@ -31,7 +29,6 @@ WALL_JUMP_X = 550
 WALL_JUMP_Y = -600
 DASH_SPEED = 1600
 
-# --- LEVEL MAPS (10 Levels) ---
 LEVEL_1 = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     "X                                      X",
@@ -75,6 +72,7 @@ LEVEL_3 = [
     "X^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^X",
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 ]
+
 
 LEVEL_4 = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -130,8 +128,14 @@ LEVEL_7 = [
     "X                                      X",
     "X                                      X",
     "X                                      X",
+    "X                                      X",
+    "X                                      X",
+    "X                                      X",
     "X       S                              X",
     "X       X                              X",
+    "X                                      X",
+    "X                                      X",
+    "X                                      X",
     "X                                      X",
     "X                                  G   X",
     "X P                               XXXXXX",
@@ -155,12 +159,17 @@ LEVEL_8 = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 ]
 
+# doesn't feel fun enough
 LEVEL_9 = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     "X                                      X",
+    "X                                      X",
+    "X                                      X",
+    "X                                  G   X",
+    "X                                  X   X",
     "X   B       B       B       B          X",
-    "X  BCB     BCB     BCB     BCB     G   X",
-    "X   X       X       X       X      X   X",
+    "X  BCB     BCB     BCB     BCB         X",
+    "X   X       X       X       X          X",
     "X                                      X",
     "X      U       U       U       U       X",
     "X     XXX     XXX     XXX     XXX      X",
@@ -172,17 +181,19 @@ LEVEL_9 = [
 ]
 
 LEVEL_10 = [
-    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-    "X                                      X",
-    "X                                   G  X",
-    "X     L     M    L XX L     M   L XXXXXX",
-    "XXXX                                   X",
-    "X                                      X",
-    "X P           U               U        X",
-    "XXXXX        XXX             XXX       X",
-    "X      S               S               X",
-    "X^^^^^^X^^^^^^^^^^^^^^^X^^^^^^^^^^^^^^^X",
-    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "X                                            X",
+    "X                                            X",
+    "X                                            X",
+    "X                                         G  X",
+    "X     L     M       L XX L        M   L XXXXXX",
+    "XXXX                                         X",
+    "X                                            X",
+    "X P              C                  C        X",
+    "XXXXX           XXX                XXX       X",
+    "X      S                     S               X",
+    "X^^^^^^X^^^^^^^^^^^^^^^^^^^^^X^^^^^^^^^^^^^^^X",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 ]
 
 LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9, LEVEL_10]
