@@ -1,7 +1,9 @@
+# main.py
 import pygame
 import sys
 import random
 import math
+import asyncio
 from settings import *
 from sprites import *
 
@@ -10,7 +12,6 @@ class Camera:
         self.camera = pygame.Rect(0, 0, width, height)
         self.width = width
         self.height = height
-        self.shake = 0
 
     def apply(self, entity):
         return entity.rect.move(self.camera.topleft)
@@ -18,16 +19,12 @@ class Camera:
     def apply_rect(self, rect):
         return rect.move(self.camera.topleft)
 
-    def update(self, target, delta_time):
+    def update(self, target, dt):
         target_x = -target.rect.centerx + int(SCREEN_WIDTH / 2)
         target_y = -target.rect.centery + int(SCREEN_HEIGHT / 2)
-        self.camera.x += (target_x - self.camera.x) * 6 * delta_time
-        self.camera.y += (target_y - self.camera.y) * 6 * delta_time
         
-        if self.shake > 0:
-            self.camera.x += random.randint(-15, 15) * self.shake
-            self.camera.y += random.randint(-15, 15) * self.shake
-            self.shake -= delta_time
+        self.camera.x = target_x
+        self.camera.y = target_y
 
 class Game:
     def __init__(self):
@@ -38,15 +35,17 @@ class Game:
         self.font = pygame.font.SysFont("Trebuchet MS", 24, bold=True)
         self.title_font = pygame.font.SysFont("Trebuchet MS", 56, bold=True)
         self.small_font = pygame.font.SysFont("Trebuchet MS", 12, bold=True)
+        
         self.state = "MENU"
         self.score = 0
         self.current_level = 0
         self.level_time = 0.0
         self.dark_overlay = self.create_dark_overlay()
+        self.kill_y = 0 
         
-        # stars
+        # spawn stars
         self.stars = []
-        for i in range(150):
+        for _ in range(150):
             star_x = random.randint(0, SCREEN_WIDTH * 3)
             star_y = random.randint(0, SCREEN_HEIGHT * 3)
             star_size = random.random()
@@ -65,6 +64,7 @@ class Game:
         return overlay
 
     def load_level(self):
+        # init groups
         self.platforms = pygame.sprite.Group()
         self.limits = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
@@ -74,12 +74,16 @@ class Game:
         self.particles = pygame.sprite.Group()
         self.interactables = pygame.sprite.Group()
         self.ui_elements = pygame.sprite.Group()
+        self.orbs = pygame.sprite.Group()
         
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.level_time = 0.0
         self.fade_alpha = 255
 
         map_data = LEVELS[self.current_level]
+        self.kill_y = len(map_data) * TILE_SIZE + 400 # fall death threshold
+        
+        # parse map
         for row, tiles in enumerate(map_data):
             for col, tile in enumerate(tiles):
                 x = col * TILE_SIZE
@@ -102,11 +106,17 @@ class Game:
                 elif tile == "C":
                     c = Coin(x, y)
                     self.coins.add(c)
+                elif tile == "O":
+                    o = JumpOrb(x, y)
+                    self.orbs.add(o)
                 elif tile == "E":
                     e = Enemy(x, y, "red")
                     self.enemies.add(e)
                 elif tile == "U":
                     e = Enemy(x, y, "purple")
+                    self.enemies.add(e)
+                elif tile == "F":
+                    e = Enemy(x, y, "flyer")
                     self.enemies.add(e)
                 elif tile == "S":
                     s = Spring(x, y)
@@ -128,6 +138,12 @@ class Game:
                 sys.exit() 
                 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE or event.key == pygame.K_p:
+                    if self.state == "PLAYING":
+                        self.state = "PAUSED"
+                    elif self.state == "PAUSED":
+                        self.state = "PLAYING"
+                        
                 if (self.state == "MENU" or self.state == "WIN") and event.key == pygame.K_SPACE:
                     if self.state == "WIN":
                         self.current_level = 0
@@ -135,50 +151,65 @@ class Game:
                     self.load_level()
                     self.state = "PLAYING"
                     
+                elif self.state in ["PLAYING", "PAUSED"] and event.key == pygame.K_r:
+                    self.load_level()
+                    self.state = "PLAYING"
+                    
                 elif self.state == "PLAYING":
                     if event.key == pygame.K_SPACE or event.key == pygame.K_w or event.key == pygame.K_UP:
                         self.player.jump()
-                    elif event.key == pygame.K_r:
-                        self.load_level()
                         
             if event.type == pygame.KEYUP and self.state == "PLAYING":
                 if event.key == pygame.K_SPACE or event.key == pygame.K_w or event.key == pygame.K_UP:
                     self.player.jump_cut()
 
-    def update(self, delta_time):
+    def update(self, dt):
+        if self.state == "PAUSED":
+            return
+            
         if self.state != "PLAYING":
             return
         
-        self.level_time += delta_time
+        self.level_time += dt
         
         if self.fade_alpha > 0:
-            self.fade_alpha -= 400 * delta_time
+            self.fade_alpha -= 400 * dt
             if self.fade_alpha < 0:
                 self.fade_alpha = 0
                 
-        self.platforms.update(delta_time, self.platforms, self.limits)
-        self.player.update(delta_time, self.platforms, self.hazards, self.enemies, self.springs, self)
+        # update everything
+        self.platforms.update(dt, self.platforms, self.limits)
+        self.player.update(dt, self.platforms, self.hazards, self.enemies, self.springs, self)
         
         for e in self.enemies: 
-            e.update(delta_time, self.player, self.platforms)
+            e.update(dt, self.player, self.platforms)
             
-        self.coins.update(delta_time)
-        self.springs.update(delta_time)
-        self.particles.update(delta_time)
-        self.interactables.update(delta_time)
-        self.ui_elements.update(delta_time)
+        self.coins.update(dt)
+        self.orbs.update(dt)
+        self.springs.update(dt)
+        self.particles.update(dt)
+        self.interactables.update(dt)
+        self.ui_elements.update(dt)
         
-        self.camera.update(self.player, delta_time)
+        self.camera.update(self.player, dt)
         
+        # handle collectables
         hits = pygame.sprite.spritecollide(self.player, self.coins, True)
         for hit in hits:
             self.score += 50
             score_popup = PopupText(hit.rect.centerx, hit.rect.centery, "+50", COIN_COLOR)
             self.ui_elements.add(score_popup)
-            
-            for i in range(5):
+            for _ in range(5):
                 p = Particle(hit.rect.centerx, hit.rect.centery, COIN_COLOR)
                 self.particles.add(p)
+                
+        orb_hits = pygame.sprite.spritecollide(self.player, self.orbs, False)
+        for o in orb_hits:
+            if o.active:
+                o.collect()
+                self.player.jumps_left = 2
+                for _ in range(4):
+                    self.particles.add(Particle(o.rect.centerx, o.rect.centery, ORB_COLOR))
                 
         interacts = pygame.sprite.spritecollide(self.player, self.interactables, False)
         for i in interacts:
@@ -215,7 +246,6 @@ class Game:
         title_txt = self.font.render("Simple 2D Platformer", True, (150, 150, 180))
         score_txt = self.font.render(f"Score: {self.score}", True, TEXT_COLOR)
         level_txt = self.font.render(f"Level: {self.current_level + 1} / {len(LEVELS)}", True, TEXT_COLOR)
-        
         time_txt = self.font.render(f"Time: {round(self.level_time, 1)}s", True, COIN_COLOR)
         
         self.screen.blit(title_txt, (SCREEN_WIDTH // 2 - title_txt.get_width() // 2, 10 + int(pulse_effect * 0.5)))
@@ -223,7 +253,7 @@ class Game:
         self.screen.blit(level_txt, (SCREEN_WIDTH // 2 - level_txt.get_width() // 2, 40))
         self.screen.blit(time_txt, (SCREEN_WIDTH - time_txt.get_width() - 20, 20))
         
-        # cd bar
+        # dash cooldown bar
         pygame.draw.rect(self.screen, (30, 30, 40), (20, 60, 150, 15), border_radius=4)
         if self.player.dash_cd <= 0:
             pygame.draw.rect(self.screen, PLAYER_DASH_COLOR, (20, 60, 150, 15), border_radius=4)
@@ -246,58 +276,87 @@ class Game:
             txt = self.font.render(sub_str, True, TEXT_COLOR)
             
             for i in range(1, 4):
-                glow = self.title_font.render(title_str, True, (100, 50, 200))
-                glow.set_alpha(100 // i)
-                self.screen.blit(glow, (SCREEN_WIDTH//2 - title.get_width()//2 + i*2, SCREEN_HEIGHT//2 - 60 + i*2))
+                glow = self.title_font.render(title_str, True, (100, 50, 150))
+                self.screen.blit(glow, (SCREEN_WIDTH // 2 - title.get_width() // 2 + i * 2, SCREEN_HEIGHT // 3 + i * 2))
                 
-            self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, SCREEN_HEIGHT//2 - 60))
-            self.screen.blit(txt, (SCREEN_WIDTH//2 - txt.get_width()//2, SCREEN_HEIGHT//2 + 20))
+            self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT // 3))
             
+            pulse = math.sin(pygame.time.get_ticks() / 200.0) * 10
+            self.screen.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2, SCREEN_HEIGHT // 2 + 50 + int(pulse)))
         else:
             self.draw_bg()
             
-            for p in self.platforms: 
-                draw_shadow(self.screen, self.camera.apply_rect(p.rect), radius=0)
+            # culling rect
+            view_rect = pygame.Rect(-self.camera.camera.x - 80, -self.camera.camera.y - 80, SCREEN_WIDTH + 160, SCREEN_HEIGHT + 160)
             
+            for g in self.interactables:
+                if view_rect.colliderect(g.rect): self.screen.blit(g.image, self.camera.apply(g))
             for p in self.platforms:
-                self.screen.blit(p.image, self.camera.apply(p))
-            for h in self.hazards:
-                self.screen.blit(h.image, self.camera.apply(h))
+                if view_rect.colliderect(p.rect): self.screen.blit(p.image, self.camera.apply(p))
             for s in self.springs:
-                self.screen.blit(s.image, self.camera.apply(s))
+                if view_rect.colliderect(s.rect): self.screen.blit(s.image, self.camera.apply(s))
+            for h in self.hazards:
+                if view_rect.colliderect(h.rect): self.screen.blit(h.image, self.camera.apply(h))
             for c in self.coins:
-                self.screen.blit(c.image, self.camera.apply(c))
-            for i in self.interactables:
-                self.screen.blit(i.image, self.camera.apply(i))
+                if view_rect.colliderect(c.rect): self.screen.blit(c.image, self.camera.apply(c))
+            for o in self.orbs:
+                if view_rect.colliderect(o.rect): self.screen.blit(o.image, self.camera.apply(o))
+                
             for e in self.enemies:
-                self.screen.blit(e.image, self.camera.apply(e))
-            for p in self.particles:
-                self.screen.blit(p.image, self.camera.apply(p))
-                
-            self.screen.blit(self.player.image, self.camera.apply(self.player))
+                if view_rect.colliderect(e.rect):
+                    cam_rect = self.camera.apply(e)
+                    draw_shadow(self.screen, cam_rect, radius=6)
+                    ox = (e.image.get_width() - e.rect.width) // 2
+                    oy = (e.image.get_height() - e.rect.height) // 2
+                    self.screen.blit(e.image, (cam_rect.x - ox, cam_rect.y - oy))
                     
-            self.screen.blit(self.dark_overlay, (0,0))
-            
-            for ui in self.ui_elements: 
-                self.screen.blit(ui.image, self.camera.apply(ui))
+            for p in self.particles:
+                if view_rect.colliderect(p.rect): self.screen.blit(p.image, self.camera.apply(p))
                 
+            cam_p = self.camera.apply(self.player)
+            draw_shadow(self.screen, cam_p, radius=4)
+            ox = (self.player.image.get_width() - self.player.rect.width) // 2
+            oy = (self.player.image.get_height() - self.player.rect.height) // 2
+            self.screen.blit(self.player.image, (cam_p.x - ox, cam_p.y - oy))
+            
+            for u in self.ui_elements:
+                if view_rect.colliderect(u.rect): self.screen.blit(u.image, self.camera.apply(u))
+                
+            self.screen.blit(self.dark_overlay, (0, 0))
             self.draw_hud()
             
             if self.fade_alpha > 0:
                 fade_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-                fade_surf.fill((15, 20, 30))
+                fade_surf.fill((0, 0, 0))
                 fade_surf.set_alpha(int(self.fade_alpha))
                 self.screen.blit(fade_surf, (0, 0))
-            
+                
+            # UI overlay
+            if self.state == "PAUSED":
+                pause_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                pause_overlay.fill((0, 0, 0, 150))
+                self.screen.blit(pause_overlay, (0, 0))
+                pause_title = self.title_font.render("PAUSED", True, TEXT_COLOR)
+                self.screen.blit(pause_title, (SCREEN_WIDTH // 2 - pause_title.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
+                pause_sub = self.font.render("Press ESC to Resume or R to Reset", True, TEXT_COLOR)
+                self.screen.blit(pause_sub, (SCREEN_WIDTH // 2 - pause_sub.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+                
         pygame.display.flip()
 
-    def run(self):
+    async def run(self):
+        # main game loop
         while True:
-            delta_time = self.clock.tick(FPS) / 1000.0
+            dt = self.clock.tick(FPS) / 1000.0
+            if dt > 0.05:
+                dt = 0.05 # cap dt lag
+                
+            # print(f"FPS: {self.clock.get_fps()}")
+            
             self.events()
-            self.update(delta_time)
+            self.update(dt)
             self.draw()
+            await asyncio.sleep(0)
 
 if __name__ == "__main__":
     game = Game()
-    game.run()
+    asyncio.run(game.run())

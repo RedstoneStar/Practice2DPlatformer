@@ -1,5 +1,25 @@
-venv/
+# Virtual Environments
 .venv/
-build/
+venv/
+ENV/
+
+# Python cache & compiled files
 __pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.spec
+
+# Pygbag / Web zip outputs
 *.zip
+*.tar.gz
+*.apk
+
+# System & IDE files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
